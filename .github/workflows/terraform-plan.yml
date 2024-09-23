@@ -1,0 +1,47 @@
+# .github/workflows/terraform_plan.yml
+name: Terraform Plan
+
+on:
+  #push:
+  #  branches:
+  #    - main
+  workflow_dispatch:  # Allows manual triggering
+    inputs:
+      environment:
+        description: 'Environment to plan for (dev or prod)'
+        required: true
+        default: dev
+
+jobs:
+  terraform:
+    runs-on: ubuntu-latest
+
+    env:
+      AWS_ACCESS_KEY_ID: ${{ secrets.SANDBOX2_AWS_ACCESS_KEY_ID }}
+      AWS_SECRET_ACCESS_KEY: ${{ secrets.SANDBOX2_AWS_SECRET_ACCESS_KEY }}
+      TF_VAR_env: ${{ github.event.inputs.environment }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+
+      - name: Set up Terraform
+        uses: hashicorp/setup-terraform@v2
+        with:
+          terraform_version: 1.9.0
+
+      - name: Set environment
+        run: echo "ENVIRONMENT=${{ github.event.inputs.environment || 'dev' }}" >> $GITHUB_ENV
+
+      - name: Terraform Init
+        run: terraform init -backend-config="./environment/${{ env.ENVIRONMENT }}/backend-${{ env.ENVIRONMENT }}.tfvars"
+
+      - name: Terraform Plan
+        id: plan
+        run: terraform plan -var-file="./environment/${{ env.ENVIRONMENT }}/${{ env.ENVIRONMENT }}.tfvars"
+
+      - name: Upload Terraform Plan
+        uses: actions/upload-artifact@v3
+        with:
+          name: tfplan-${{ env.ENVIRONMENT }}
+          path: tfplan
